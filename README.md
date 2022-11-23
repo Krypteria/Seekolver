@@ -19,6 +19,7 @@ options:
   -to TIMEOUT, --timeout TIMEOUT
                         timeout value for requests (default 3s)
   -r, --redirect        resolves redirections
+  -k, --insecure        Allows insecure connections
   -v, --verbose         enable verbose output
   -s, --show            displays the information of an output file in colour
   -sc STATUSCODES [STATUSCODES ...], --statusCodes STATUSCODES [STATUSCODES ...]
