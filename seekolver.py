@@ -4,8 +4,11 @@ import requests
 import os
 import sys
 import signal
+import urllib3
 import urllib
 import json
+
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 #File descriptors used by the application
 tmp_file="tmp.txt"
@@ -41,6 +44,9 @@ redirects = False
 
 #Verbose allowed
 verbose = False
+
+#Insecure requests
+secure = True
 
 #Absolute paths
 cat = "/usr/bin/cat"
@@ -91,9 +97,6 @@ def createFolders():
 	if(os.path.isfile(output_discarted)):
 		os.remove(output_discarted)
 
-	tmp = open(tmp_file, "a")
-	tmp.close()
-
 	print("[*] - Output files generated")
 	print("[*] - The output files generated are: " + PURPLE + output_available + END + " and " + PURPLE + output_discarted + END + "\n")
 
@@ -117,7 +120,10 @@ def getSubdomains(domain, args) -> bool:
 	print("	[*] -" + GREEN + " Spyonweb" + END)
 	print("	[*] -" + GREEN + " Crt.sh" + END)
 	print("	[*] -" + GREEN + " Askdns" + END)
-	
+
+	tmp = open(tmp_file, "a")
+	tmp.close()
+		
 	crtsh(domain,args)
 	spyonweb(domain,args)
 	alienvault(domain,args)
@@ -181,15 +187,15 @@ def doRequest(url) -> dict:
 	try:
 		r, ext, redirect = "","",None
 		if("https" in url):
-			r = requests.get(url+":443", headers=headers, timeout=timeoutValue, allow_redirects=False)
+			r = requests.get(url+":443", headers=headers, timeout=timeoutValue, allow_redirects=False, verify=secure)
 		elif("http" in url):
-			r = requests.get(url+":80", headers=headers,timeout=timeoutValue, allow_redirects=False)
+			r = requests.get(url+":80", headers=headers,timeout=timeoutValue, allow_redirects=False,verify=secure)
 		else:
 			try:
-				r = requests.get("https://"+url+":443", headers=headers,timeout=timeoutValue,allow_redirects=False)
+				r = requests.get("https://"+url+":443", headers=headers, timeout=timeoutValue, allow_redirects=False, verify=secure)
 				ext="https://"
 			except:
-				r = requests.get("http://"+url+":80", headers=headers,timeout=timeoutValue,allow_redirects=False)
+				r = requests.get("http://"+url+":80", headers=headers, timeout=timeoutValue, allow_redirects=False, verify=secure)
 				ext="http://"
 		if(redirects):
 			if(r.status_code in [301,302,307] and r.headers['Location']):
@@ -202,7 +208,6 @@ def doRequest(url) -> dict:
 
 def resolve():
 	global all_subdomains
-
 	urls=""
 	try:
 		urls = open(input_file).read().splitlines()
@@ -309,6 +314,7 @@ def parseArguments() -> dict:
 	parser.add_argument('-t', '--threads', type=int, help='number of threads to be used (default 50)')
 	parser.add_argument('-to', '--timeout',type=int, help='timeout value for requests (default 3s)')
 	parser.add_argument('-r', '--redirect',action='store_true', help='resolves redirections')
+	parser.add_argument('-k', '--insecure', action='store_true', help='Allow insecure server connections')
 	parser.add_argument('-v', '--verbose',action='store_true', help='enable verbose output')
 	parser.add_argument('-s', '--show',action='store_true',help='displays the information of an output file in colour')
 	parser.add_argument('-sc', '--statusCodes',nargs='+',help='filters the show parameter output to certain status codes')
@@ -348,7 +354,6 @@ if __name__ == "__main__":
 		parseFileInfo()
 		sys.exit(0)
 
-	createFolders()
 	parseTokens()
 
 	if(args.targetEntity):
@@ -364,9 +369,12 @@ if __name__ == "__main__":
 		timeoutValue = args.timeout
 	if(args.redirect):
 		redirects = True
+	if(args.insecure):
+		secure = False
 	if(args.verbose):
 		verbose = True
 
+	createFolders()
 	resolve()
 	saveResults()
 
