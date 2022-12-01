@@ -1,4 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from bs4 import BeautifulSoup
+
 import argparse
 import requests
 import os
@@ -48,30 +50,21 @@ verbose = False
 #Insecure requests
 secure = True
 
-#Absolute paths
-cat = "/usr/bin/cat"
-grep = "/usr/bin/grep"
-rm = "/usr/bin/rm"
-awk = "/usr/bin/awk"
-curl = "/usr/bin/curl"
-sort = "/usr/bin/sort"
-jq = "/usr/bin/jq"
-sed = "/usr/bin/sed"
-tr = "/usr/bin/tr"
-
 #Headers
-headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0", "Accept": "text/html,application/xhtml+xml,application/xml"}
-headers_curl_json = "-H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0' -H 'Accept: application/json, text/plain, */*'"
-headers_curl_html = "-H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0' -H 'Accept: text/html,application/xhtml+xml,application/xml'"
+headers_json = {"User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0", "Accept" : "application/json, text/plain, */*"}
+headers_html = {"User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0", "Accept" : "text/html,application/xhtml+xml,application/xml"}
 
-#Colors
-BLUE= "\033[1;34;40m"
-LIGHT_BLUE= "\033[0;34m" 
-PURPLE= "\033[1;35;40m"
-YELLOW= "\033[1;33;40m"
-RED= "\033[1;31;40m"
-GREEN= "\033[1;32;40m"
-END= "\033[0m"
+#Colors 
+BLUE,LIGHT_BLUE,PURPLE,YELLOW,RED,GREEN,END="","","","","","",""
+#fix to windows bug with colors
+if(os.name != "nt"):
+	BLUE= "\033[1;34;40m"
+	LIGHT_BLUE= "\033[0;34m" 
+	PURPLE= "\033[1;35;40m"
+	YELLOW= "\033[1;33;40m"
+	RED= "\033[1;31;40m"
+	GREEN= "\033[1;32;40m"
+	END= "\033[0m"
 
 #CTRL + C
 def def_handler(sig, frame):
@@ -97,6 +90,17 @@ def createFolders():
 	if(os.path.isfile(output_discarted)):
 		os.remove(output_discarted)
 
+	if(os.path.isfile(tmp_file)):
+		os.remove(tmp_file)
+
+	if(os.path.isfile(input_file)):
+		os.remove(input_file)
+
+	open(output_available, "x")
+	open(output_discarted, "x")
+	open(input_file, "x")
+	open(tmp_file, "x")
+
 	print("[*] - Output files generated")
 	print("[*] - The output files generated are: " + PURPLE + output_available + END + " and " + PURPLE + output_discarted + END + "\n")
 
@@ -104,25 +108,25 @@ def parseTokens():
 	global apiTokens
 	if(os.path.isfile(apitoken_file)):
 		try:
-			apiTokensRaw = open(apitoken_file).read()
-			apiTokens = json.loads(apiTokensRaw)
-			print("[*] - API tokens loaded")
+			apiTokens = json.loads(open(apitoken_file).read())
+			print(GREEN + "[*] - API tokens loaded" + END)
 		except:
-			print("[*] - Zero API tokens loaded")
+			print(YELLOW + "[*] - Zero API tokens loaded" + END)
 
 def getSubdomains(domain, args) -> bool:
 	print("\n------------------------- SUBDOMAIN SEARCH -------------------------\n")
 
-	print("[*] - Searching for subdomains associated with the domain " + YELLOW + domain + END + "\n")
+	if(args.organisationName):
+		print("[*] - Searching for subdomains associated with the organization " + YELLOW + domain + END + "\n")
+	if(args.commonName):
+		print("[*] - Searching for subdomains associated with the domain " + YELLOW + domain + END + "\n")
+
 	print("	[*] -" + GREEN + " Securitytrails" + END)
 	print("	[*] -" + GREEN + " Alienvault" + END)
 	print("	[*] -" + GREEN + " Virustotal" + END)
 	print("	[*] -" + GREEN + " Spyonweb" + END)
 	print("	[*] -" + GREEN + " Crt.sh" + END)
 	print("	[*] -" + GREEN + " Askdns" + END)
-
-	tmp = open(tmp_file, "a")
-	tmp.close()
 		
 	crtsh(domain,args)
 	spyonweb(domain,args)
@@ -131,8 +135,12 @@ def getSubdomains(domain, args) -> bool:
 	securitytrails(domain, args)
 	virustotal(domain, args)
 
-	os.system("{cat} {tmpFile} | {sort} -u > {reconFile}".format(tmpFile=tmp_file, reconFile=input_file, cat=cat, sort=sort))
-	os.system("{rm} {tmpFile}".format(tmpFile=tmp_file, rm=rm))
+	output_file = open(input_file, "a")
+	for subdomain in list(set(open(tmp_file).read().splitlines())):
+		output_file.write(subdomain+"\n")
+	
+	output_file.close()
+	os.remove(tmp_file)
 
 	if os.path.getsize(input_file) != 0:
 		print("\n[*] - Subdomains associated with the domain {domain} found".format(domain=domain))
@@ -142,60 +150,108 @@ def getSubdomains(domain, args) -> bool:
 		return False
 
 def crtsh(domain, args) -> None:
-	searchField=""
+	searchField,url = "",""
 	if(args.commonName):
-		os.system("{curl} -X GET -s {header} https://crt.sh/\?q\={domain}\&output\=json > output_crtsh.json".format(header=headers_curl_json, domain=urllib.parse.quote_plus(domain), curl=curl))
-		searchField = "name_value"
+		searchField, url = "name_value", "https://crt.sh/?q={domain}&output=json".format(domain=urllib.parse.quote_plus(domain))
 	if(args.organisationName):
-		os.system("{curl} -X GET -s {header} https://crt.sh/\?O\={domain}\&output\=json > output_crtsh.json".format(header=headers_curl_json, domain=urllib.parse.quote_plus(domain), curl=curl))
-		searchField = "common_name"
-
-	os.system("{cat} output_crtsh.json | {jq} -r '.[].{searchField}' | {sort} -u | {sed} '/*/d' | {grep} {domain} |{grep} -v '@' >> {tmpFile}".format(searchField=searchField, tmpFile=tmp_file, domain=domain.split(".")[0], cat=cat, jq=jq, sort=sort, sed=sed, grep=grep))
-	os.system("{rm} output_crtsh.json".format(rm=rm))
+		searchField, url = "common_name", "https://crt.sh/?O={domain}&output=json".format(domain=urllib.parse.quote_plus(domain))
+	
+	try:
+		response = requests.get(url, headers=headers_json)
+		response_json = json.loads(response.text)
+		
+		output_file = open(tmp_file, "a")
+		for entry in response_json:
+			if("*" not in entry[searchField]):
+				output_file.write(entry[searchField]+"\n")
+		output_file.close()
+	except:
+		print(RED + "[!] - An error occurred while querying crtsh" + END)
 
 def alienvault(domain, args) -> None:
 	if(args.commonName):
-		os.system("{curl} -X GET -s {header} https://otx.alienvault.com/otxapi/indicators/domain/passive_dns/{domain} > output_alienvault.json".format(header=headers_curl_json, domain=urllib.parse.quote_plus(domain), curl=curl))
-		os.system("{cat} output_alienvault.json | {jq} -r '.[][].hostname' 2>/dev/null | {sort} -u | {grep} {domain} | {sed} '/*/d' >> {tmpFile}".format(tmpFile=tmp_file, domain=domain.split(".")[0], cat=cat, jq=jq, sort=sort, grep=grep, sed=sed))
-		os.system("{rm} output_alienvault.json".format(rm=rm))
+		try:
+			response = requests.get("https://otx.alienvault.com/otxapi/indicators/domain/passive_dns/{domain}".format(domain=urllib.parse.quote_plus(domain)), headers=headers_json)
+			response_json = json.loads(response.text)
+
+			output_file = open(tmp_file, "a")
+			for entry in response_json["passive_dns"]:
+				output_file.write(entry["hostname"]+"\n")
+			output_file.close()
+		except:
+			print(RED + "[!] - An error occurred while querying alienvault" + END)
 
 def askdns(domain, args) -> None:
 	if(args.commonName):
-		os.system("{curl} -X GET -s {header} https://askdns.com/domain/{domain} > output_askdns.json".format(header=headers_curl_html, domain=urllib.parse.quote_plus(domain), curl=curl))
-		os.system("{cat} output_askdns.json | {grep} -Po '<a href.*?</a>' | {grep} -Po '>.*?<' | {tr} -d '>' | {tr} -d '<' | {grep} {domain} >> {tmpFile}".format(tmpFile=tmp_file, domain=domain.split(".")[0], cat=cat, grep=grep, tr=tr))
-		os.system("{rm} output_askdns.json".format(rm=rm))
+		try:
+			response = requests.get("https://askdns.com/domain/{domain}".format(domain=urllib.parse.quote_plus(domain)), headers=headers_html)
+			response_html = BeautifulSoup(response.text, 'html.parser')
 
+			output_file = open(tmp_file, "a")
+			for entry in response_html.find_all('a'):
+				if(domain.split(".")[0] in entry.get_text()):
+					output_file.write(entry.get_text()+"\n")
+			output_file.close()
+		except:
+			print(RED + "[!] - An error occurred while querying askdns" + END)
+		
 def spyonweb(domain, args) -> None:
 	if(args.commonName):
-		os.system("{curl} -X GET -s {header} https://spyonweb.com/{domain} > output_spyonweb.json".format(header=headers_curl_html, domain=urllib.parse.quote_plus(domain), curl=curl))
-		os.system("{cat} output_spyonweb.json | {grep} -Po '<a href.*?</a>' | {grep} {domain} | {grep} -Po '/go.*?\"' | {awk} -F '/' {{'print $3'}} | {tr} -d '\"' >> {tmpFile}".format(tmpFile=tmp_file, domain=domain.split(".")[0], cat=cat, grep=grep, awk=awk, tr=tr))
-		os.system("{rm} output_spyonweb.json".format(rm=rm))
+		try:
+			response = requests.get("https://spyonweb.com/{domain}".format(domain=urllib.parse.quote_plus(domain)), headers=headers_html)
+			response_html = BeautifulSoup(response.text, 'html.parser')
+
+			output_file = open(tmp_file, "a")
+			for entry in response_html.find_all("div", {'class':'links'})[0].find_all('a'):
+				if(entry.get_text() != ""):
+					output_file(entry.get_text()+"\n")
+			output_file.close()
+		except:
+			print(RED + "[!] - An error occurred while querying spyonweb" + END)
 
 def securitytrails(domain, args) -> None:
 	if(args.commonName and "securitytrails" in apiTokens):
-		os.system("{curl} -X GET -s {header} -H '{token_name}: {token_value}' https://api.securitytrails.com/v1/domain/{domain}/subdomains > output_securitytrails.json".format(header=headers_curl_json, domain=urllib.parse.quote_plus(domain), curl=curl, token_name=apiTokens["securitytrails"][0], token_value=apiTokens["securitytrails"][1]))	
-		os.system("{cat} output_securitytrails.json | {jq} -r '.subdomains[]' | {awk} '$0=$0\".{domain}\"' >> {tmpFile}".format(tmpFile=tmp_file, domain=domain, cat=cat, jq=jq, awk=awk))
-		os.system("{rm} output_securitytrails.json".format(rm=rm))
+		try:
+			securitytrails_header = dict(headers_json)
+			securitytrails_header[apiTokens["securitytrails"][0]]=apiTokens["securitytrails"][1]
+			response = requests.get("https://api.securitytrails.com/v1/domain/{domain}/subdomains".format(domain=urllib.parse.quote_plus(domain)), headers=securitytrails_header)
+			response_json = json.loads(response.text)
+
+			output_file = open(tmp_file, "a")
+			for entry in response_json["subdomains"]:
+				output_file.write(entry+".{domain}\n".format(domain=domain))
+			output_file.close()
+		except:
+			print(RED + "[!] - An error occurred while querying securitytrails" + END)
 
 def virustotal(domain, args) -> None:
 	if(args.commonName and "virustotal" in apiTokens):
-		os.system("{curl} -X GET -s {header} -H '{token_name}: {token_value}' https://www.virustotal.com/api/v3/domains/{domain}/subdomains?limit=1000 > output_virustotal.json".format(header=headers_curl_json, domain=urllib.parse.quote_plus(domain), curl=curl, token_name=apiTokens["virustotal"][0], token_value=apiTokens["virustotal"][1]))	
-		os.system("{cat} output_virustotal.json | {jq} .data[].id | {grep} {domain} | {tr} -d '\"' >> {tmpFile}".format(tmpFile=tmp_file, domain=domain.split(".")[0], cat=cat, jq=jq, grep=grep, tr=tr))
-		os.system("{rm} output_virustotal.json".format(rm=rm))
+		try:
+			virustotal_header = dict(headers_json)
+			virustotal_header[apiTokens["virustotal"][0]]=apiTokens["virustotal"][1]
+			response = requests.get("https://www.virustotal.com/api/v3/domains/{domain}/subdomains?limit=1000".format(domain=urllib.parse.quote_plus(domain)), headers=virustotal_header)
+			response_json = json.loads(response.text)
+
+			output_file = open(tmp_file, "a")
+			for entry in response_json["data"]: 
+				output_file.write(entry["id"]+"\n")
+			output_file.close()
+		except:
+			print(RED + "[!] - An error occurred while querying virustotal" + END)
 
 def doRequest(url) -> dict:
 	try:
 		r, ext, redirect = "","",None
 		if("https" in url):
-			r = requests.get(url+":443", headers=headers, timeout=timeoutValue, allow_redirects=False, verify=secure)
+			r = requests.get(url+":443", headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
 		elif("http" in url):
-			r = requests.get(url+":80", headers=headers,timeout=timeoutValue, allow_redirects=False,verify=secure)
+			r = requests.get(url+":80", headers=headers_html,timeout=timeoutValue, allow_redirects=False,verify=secure)
 		else:
 			try:
-				r = requests.get("https://"+url+":443", headers=headers, timeout=timeoutValue, allow_redirects=False, verify=secure)
+				r = requests.get("https://"+url+":443", headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
 				ext="https://"
 			except:
-				r = requests.get("http://"+url+":80", headers=headers, timeout=timeoutValue, allow_redirects=False, verify=secure)
+				r = requests.get("http://"+url+":80", headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
 				ext="http://"
 		if(redirects):
 			if(r.status_code in [301,302,307] and r.headers['Location']):
@@ -208,16 +264,16 @@ def doRequest(url) -> dict:
 
 def resolve():
 	global all_subdomains
-	urls=""
+	index, url = 0, ""
+
 	try:
 		urls = open(input_file).read().splitlines()
 	except:
 		print(RED + "[!] - Error opening {file}".format(file=input_file) + END)
 		sys.exit(1)
 
-	all_subdomains = len(urls)
-	index = 0
 	print("\n----------------------- RESOLVING ADDRESSES ------------------------\n")
+	all_subdomains = len(urls)
 	if(all_subdomains > 0):
 		with ThreadPoolExecutor(max_workers=min(threads,all_subdomains)) as executor:
 			futures = [executor.submit(doRequest, url) for url in urls]
@@ -279,7 +335,6 @@ def parseFileInfo():
 		except:
 			print(RED + "[!] - Error parsing the info in {file}, ¿are you using the file with the domains available?".format(file=input_file) + END)
 			sys.exit(1)
-
 
 def saveResults():
 	print("\n----------------------------- RESULTS ------------------------------\n")
@@ -356,13 +411,16 @@ if __name__ == "__main__":
 
 	parseTokens()
 
+	if(args.output):
+		output_available=args.output
+
+	createFolders()
+
 	if(args.targetEntity):
 		subdomainsFinded = getSubdomains(args.targetEntity, args)
 	else:
 		input_file = args.file
 	
-	if(args.output):
-		output_available=args.output
 	if(args.threads):
 		threads = args.threads
 	if(args.timeout):
@@ -374,7 +432,6 @@ if __name__ == "__main__":
 	if(args.verbose):
 		verbose = True
 
-	createFolders()
 	resolve()
 	saveResults()
 
