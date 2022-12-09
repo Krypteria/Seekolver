@@ -15,7 +15,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 #File descriptors used by the application
 tmp_file="tmp.txt"
 input_file="recon.txt"
-apitoken_file="apitokens.json"
+apitoken_file=os.path.dirname(os.path.realpath(sys.argv[0]))+"/apitokens.json"
 output_available="available.txt"
 output_discarted="discarted.txt"
 
@@ -112,6 +112,8 @@ def parseTokens():
 			print(GREEN + "[*] - API tokens loaded" + END)
 		except:
 			print(YELLOW + "[*] - Zero API tokens loaded" + END)
+	else:
+		print(RED + "[*] - API tokens file not found" + END)
 
 def getSubdomains(domain, args) -> bool:
 	print("\n------------------------- SUBDOMAIN SEARCH -------------------------\n")
@@ -146,7 +148,7 @@ def getSubdomains(domain, args) -> bool:
 		print("\n[*] - Subdomains associated with the domain {domain} found".format(domain=domain))
 		return True
 	else:
-		print(RED + "[!] - Domain {domain} is not correct or doesn't have subdomains\n".format(domain=domain) + END)
+		print("\n" + RED + "[!] - Domain {domain} is not correct or doesn't have subdomains\n".format(domain=domain) + END)
 		return False
 
 def crtsh(domain, args) -> None:
@@ -174,10 +176,11 @@ def alienvault(domain, args) -> None:
 			response = requests.get("https://otx.alienvault.com/otxapi/indicators/domain/passive_dns/{domain}".format(domain=urllib.parse.quote_plus(domain)), headers=headers_json)
 			response_json = json.loads(response.text)
 
-			output_file = open(tmp_file, "a")
-			for entry in response_json["passive_dns"]:
-				output_file.write(entry["hostname"]+"\n")
-			output_file.close()
+			if("passive_dns" in response_json):
+				output_file = open(tmp_file, "a")
+				for entry in response_json["passive_dns"]:
+					output_file.write(entry["hostname"]+"\n")
+				output_file.close()
 		except:
 			print(RED + "[!] - An error occurred while querying alienvault" + END)
 
@@ -189,7 +192,7 @@ def askdns(domain, args) -> None:
 
 			output_file = open(tmp_file, "a")
 			for entry in response_html.find_all('a'):
-				if(domain.split(".")[0] in entry.get_text()):
+				if(domain in entry.get_text()):
 					output_file.write(entry.get_text()+"\n")
 			output_file.close()
 		except:
@@ -200,12 +203,13 @@ def spyonweb(domain, args) -> None:
 		try:
 			response = requests.get("https://spyonweb.com/{domain}".format(domain=urllib.parse.quote_plus(domain)), headers=headers_html)
 			response_html = BeautifulSoup(response.text, 'html.parser')
-
 			output_file = open(tmp_file, "a")
-			for entry in response_html.find_all("div", {'class':'links'})[0].find_all('a'):
-				if(entry.get_text() != ""):
-					output_file(entry.get_text()+"\n")
-			output_file.close()
+			
+			if(len(response_html.find_all("div", {'class':'links'})) != 0):
+				for entry in response_html.find_all("div", {'class':'links'})[0].find_all('a'):
+					if(entry.get_text() != ""):
+						output_file.write(entry.get_text()+"\n")
+				output_file.close()
 		except:
 			print(RED + "[!] - An error occurred while querying spyonweb" + END)
 
@@ -217,10 +221,11 @@ def securitytrails(domain, args) -> None:
 			response = requests.get("https://api.securitytrails.com/v1/domain/{domain}/subdomains".format(domain=urllib.parse.quote_plus(domain)), headers=securitytrails_header)
 			response_json = json.loads(response.text)
 
-			output_file = open(tmp_file, "a")
-			for entry in response_json["subdomains"]:
-				output_file.write(entry+".{domain}\n".format(domain=domain))
-			output_file.close()
+			if("subdomains" in response_json):
+				output_file = open(tmp_file, "a")
+				for entry in response_json["subdomains"]:
+					output_file.write(entry+".{domain}\n".format(domain=domain))
+				output_file.close()
 		except:
 			print(RED + "[!] - An error occurred while querying securitytrails" + END)
 
@@ -232,10 +237,11 @@ def virustotal(domain, args) -> None:
 			response = requests.get("https://www.virustotal.com/api/v3/domains/{domain}/subdomains?limit=1000".format(domain=urllib.parse.quote_plus(domain)), headers=virustotal_header)
 			response_json = json.loads(response.text)
 
-			output_file = open(tmp_file, "a")
-			for entry in response_json["data"]: 
-				output_file.write(entry["id"]+"\n")
-			output_file.close()
+			if("data" in response_json):
+				output_file = open(tmp_file, "a")
+				for entry in response_json["data"]: 
+					output_file.write(entry["id"]+"\n")
+				output_file.close()
 		except:
 			print(RED + "[!] - An error occurred while querying virustotal" + END)
 
