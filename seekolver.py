@@ -164,7 +164,7 @@ def crtsh(domain, args) -> None:
 		
 		output_file = open(tmp_file, "a")
 		for entry in response_json:
-			if("*" not in entry[searchField]):
+			if("*" not in entry[searchField] and "@" not in entry[searchField]):
 				output_file.write(entry[searchField]+"\n")
 		output_file.close()
 	except:
@@ -207,7 +207,7 @@ def spyonweb(domain, args) -> None:
 			
 			if(len(response_html.find_all("div", {'class':'links'})) != 0):
 				for entry in response_html.find_all("div", {'class':'links'})[0].find_all('a'):
-					if(entry.get_text() != ""):
+					if(entry.get_text() != "" and domain in entry.get_text()):
 						output_file.write(entry.get_text()+"\n")
 				output_file.close()
 		except:
