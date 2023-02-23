@@ -14,7 +14,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 #File descriptors used by the application
 tmp_file="tmp.txt"
-input_file="recon.txt"
+input_file="subdomains.txt"
 apitoken_file=os.path.dirname(os.path.realpath(sys.argv[0]))+"/apitokens.json"
 output_available="available.txt"
 output_discarted="discarted.txt"
@@ -93,12 +93,8 @@ def createFolders():
 	if(os.path.isfile(tmp_file)):
 		os.remove(tmp_file)
 
-	if(os.path.isfile(input_file)):
-		os.remove(input_file)
-
 	open(output_available, "x")
 	open(output_discarted, "x")
-	open(input_file, "x")
 	open(tmp_file, "x")
 
 	print("[*] - Output files generated")
@@ -142,7 +138,6 @@ def getSubdomains(domain, args) -> bool:
 		output_file.write(subdomain+"\n")
 	
 	output_file.close()
-	os.remove(tmp_file)
 
 	if os.path.getsize(input_file) != 0:
 		print("\n[*] - Subdomains associated with the domain {domain} found".format(domain=domain))
@@ -364,6 +359,9 @@ def saveResults():
 			discarted_f.close()
 	else:
 		print("[*] - {all} subdomains obtained, {resolved} resolved. ".format(all=all_subdomains, resolved=len(available_url)))
+
+	os.remove(tmp_file)
+	
 
 def parseArguments() -> dict:
 	parser = argparse.ArgumentParser(conflict_handler='resolve')
