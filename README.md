@@ -1,11 +1,12 @@
-<img src=https://user-images.githubusercontent.com/55555187/201477747-58e9eb2a-e453-4618-b1d9-e82adbd67fc3.png>
+![image](https://user-images.githubusercontent.com/55555187/222470819-24e20322-3a83-44ab-8f64-a7a6947f3a98.png)
 
 ```
-usage: seekolver.py [-h] [-f FILE] [-o OUTPUT] [-te TARGETENTITY] [-cn] [-on] [-t THREADS] [-to TIMEOUT] [-r] [-v] [-s] [-sc STATUSCODES [STATUSCODES ...]]
+usage: seekolver.py [-h] [-f FILE] [-o OUTPUT] [-te TARGETENTITY] [-cn] [-on] [-t THREADS] [-to TIMEOUT] [-r] [-k] [-v] [-s] [-sc SHOWCODES [SHOWCODES ...]]
+                    [-sd SHOWDOMAINS [SHOWDOMAINS ...]]
 
 options:
   -h, --help            show this help message and exit
-  -f FILE, --file FILE  file with urls to resolve (default recon.txt)
+  -f FILE, --file FILE  file with urls to resolve
   -o OUTPUT, --output OUTPUT
                         name of the output file used for writing the results
   -te TARGETENTITY, --targetEntity TARGETENTITY
@@ -18,11 +19,13 @@ options:
   -to TIMEOUT, --timeout TIMEOUT
                         timeout value for requests (default 3s)
   -r, --redirect        resolves redirections
-  -k, --insecure        Allows insecure connections
+  -k, --insecure        Allow insecure server connections
   -v, --verbose         enable verbose output
   -s, --show            displays the information of an output file in colour
-  -sc STATUSCODES [STATUSCODES ...], --statusCodes STATUSCODES [STATUSCODES ...]
+  -sc SHOWCODES [SHOWCODES ...], --showCodes SHOWCODES [SHOWCODES ...]
                         filters the show parameter output to certain status codes
+  -sd SHOWDOMAINS [SHOWDOMAINS ...], --showDomains SHOWDOMAINS [SHOWDOMAINS ...]
+                        filters the show parameter output to certain domains
 ```
 
 ## About the tool
@@ -54,7 +57,7 @@ To make use of the *Virustotal* and *Securitytrails* services to search for subd
 
 ## Example of use
 
-<img src=https://user-images.githubusercontent.com/55555187/201488781-6b6b97f6-2e2e-4c8e-9095-78b9a070901d.png>
+![image](https://user-images.githubusercontent.com/55555187/222470674-1d2501ca-ed38-4a83-b9f8-b0897aaa461b.png)
 
 ### Basic usage: resolution of the urls contained in a file
 
@@ -111,7 +114,7 @@ The **-t** parameter allows to select the number of threads the tool will use wh
 
 <div align="justify">
 
-To facilitate the visualisation of results, the tool has the ability to interpret the information in the output files and apply a series of colours using the **-s** parameter, additionally a filtering based on status codes can be applied while maintaining this format with the **-sc** parameter.
+To facilitate the visualisation of results, the tool has the ability to interpret the information in the output files and apply a series of colours using the **-s** parameter, additionally a filtering based on status codes can be applied while maintaining this format with the **-sc** parameter and a filtering based on domain names can be applied using **-sd**
 
 </div>
 
@@ -119,7 +122,7 @@ To facilitate the visualisation of results, the tool has the ability to interpre
 python3 seekolver.py -f available.txt -s -sc 200 301 302 401
 ```
 
-<img src=https://user-images.githubusercontent.com/55555187/201488782-b866a469-c4d8-4338-85fb-57d0c77fb164.png>
+![image](https://user-images.githubusercontent.com/55555187/222472393-bd2fde0d-8300-4efd-949a-d06369e053fc.png)
 
 ## Dependencies
 

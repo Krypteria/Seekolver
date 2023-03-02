@@ -1,6 +1,7 @@
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from bs4 import BeautifulSoup
 
+import datetime
 import argparse
 import requests
 import os
@@ -18,6 +19,7 @@ input_file="subdomains.txt"
 apitoken_file=os.path.dirname(os.path.realpath(sys.argv[0]))+"/apitokens.json"
 output_available="available.txt"
 output_discarted="discarted.txt"
+folderName = ""
 
 #Used to save the results on execution time
 available_url={}
@@ -40,6 +42,9 @@ status_codes = [200,301,302,307,401,403,404,405,500,502,503]
 
 #filtered status codes
 filtered_status_codes = ["200","301","302","307","401","403","404","405","500","502","503"]
+
+#filtered domains
+filtered_domains = None
 
 #Redirects allowed
 redirects = False
@@ -75,30 +80,39 @@ def def_handler(sig, frame):
 signal.signal(signal.SIGINT, def_handler)
 
 def printLogo():                 
-	print("____________________________________________________________________\n")
-	print("           ____ ____ ____ _  _ ____ _    _  _ ____ ____            ")
-	print("           [__  |___ |___ |_/  |  | |    |  | |___ |__/            ")
-	print("           ___] |___ |___ | \_ |__| |___  \/  |___ |  \          \n")      
-	print("			    By " + GREEN + "Kripteria" + END)                                                          
-	print("____________________________________________________________________\n")
+	print(" __   ____  ____ __ __   ___   __    __ __  ____ ____            ")
+	print("(( \ ||    ||    || //  // \\\  ||    || || ||    || \\\   ")
+	print(" \\\  ||==  ||==  ||<<  ((   )) ||    \\\ // ||==  ||_//  ")   
+	print("\_)) ||___ ||___ || \\\  \\\_//  ||__|  \V/  ||___ || \\\ \n")   
 
 def createFolders():
-	print("\n----------------------- GENERATING OUTPUT FILES --------------------\n")
-	if(os.path.isfile(output_available)):
-		os.remove(output_available)
+	global output_available, output_discarted,folderName
+	print("\n[*] - Generating output files \n")
+	now = datetime.datetime.now()
+	folderName = now.strftime("seekolver_%Y_%m_%d")
+	if not os.path.isdir(folderName):
+		os.makedirs(folderName)
 
-	if(os.path.isfile(output_discarted)):
-		os.remove(output_discarted)
+	if os.path.exists(folderName + "/" + output_available):
+		count = 2
+		while True:
+			newFilename = "available_{count}.txt".format(count=count)
+			if not os.path.exists(folderName + "/" + newFilename):
+				break
+			count += 1
+		output_available = newFilename
+		output_discarted = "discarted_{count}.txt".format(count=count)
+
+	open(folderName + "/" + output_available, "x")
+	open(folderName + "/" + output_discarted, "x")
 
 	if(os.path.isfile(tmp_file)):
 		os.remove(tmp_file)
 
-	open(output_available, "x")
-	open(output_discarted, "x")
 	open(tmp_file, "x")
 
-	print("[*] - Output files generated")
-	print("[*] - The output files generated are: " + PURPLE + output_available + END + " and " + PURPLE + output_discarted + END + "\n")
+	print("\t[*] - Output files generated")
+	print("\t[*] - The output files generated are: " + PURPLE + output_available + END + " and " + PURPLE + output_discarted + END)
 
 def parseTokens():
 	global apiTokens
@@ -112,19 +126,19 @@ def parseTokens():
 		print(RED + "[*] - API tokens file not found" + END)
 
 def getSubdomains(domain, args) -> bool:
-	print("\n------------------------- SUBDOMAIN SEARCH -------------------------\n")
+	print("\n[*] - Subdomain search \n")
 
 	if(args.organisationName):
-		print("[*] - Searching for subdomains associated with the organization " + YELLOW + domain + END + "\n")
+		print("\t[*] - Searching for subdomains associated with the organization " + YELLOW + domain + END + "\n")
 	if(args.commonName):
-		print("[*] - Searching for subdomains associated with the domain " + YELLOW + domain + END + "\n")
+		print("\t[*] - Searching for subdomains associated with the domain " + YELLOW + domain + END + "\n")
 
-	print("	[*] -" + GREEN + " Securitytrails" + END)
-	print("	[*] -" + GREEN + " Alienvault" + END)
-	print("	[*] -" + GREEN + " Virustotal" + END)
-	print("	[*] -" + GREEN + " Spyonweb" + END)
-	print("	[*] -" + GREEN + " Crt.sh" + END)
-	print("	[*] -" + GREEN + " Askdns" + END)
+	print("\t[*] -" + GREEN + " Securitytrails" + END)
+	print("\t[*] -" + GREEN + " Alienvault" + END)
+	print("\t[*] -" + GREEN + " Virustotal" + END)
+	print("\t[*] -" + GREEN + " Spyonweb" + END)
+	print("\t[*] -" + GREEN + " Crt.sh" + END)
+	print("\t[*] -" + GREEN + " Askdns" + END)
 		
 	crtsh(domain,args)
 	spyonweb(domain,args)
@@ -133,6 +147,9 @@ def getSubdomains(domain, args) -> bool:
 	securitytrails(domain, args)
 	virustotal(domain, args)
 
+	if(os.path.exists(input_file)):
+		os.remove(input_file)
+
 	output_file = open(input_file, "a")
 	for subdomain in list(set(open(tmp_file).read().splitlines())):
 		output_file.write(subdomain+"\n")
@@ -140,10 +157,10 @@ def getSubdomains(domain, args) -> bool:
 	output_file.close()
 
 	if os.path.getsize(input_file) != 0:
-		print("\n[*] - Subdomains associated with the domain {domain} found".format(domain=domain))
+		print("\n\t[*] - Subdomains associated with the domain {domain} found".format(domain=domain))
 		return True
 	else:
-		print("\n" + RED + "[!] - Domain {domain} is not correct or doesn't have subdomains\n".format(domain=domain) + END)
+		print("\n\t" + RED + "[!] - Domain {domain} is not correct or doesn't have subdomains\n".format(domain=domain) + END)
 		return False
 
 def crtsh(domain, args) -> None:
@@ -163,7 +180,7 @@ def crtsh(domain, args) -> None:
 				output_file.write(entry[searchField]+"\n")
 		output_file.close()
 	except:
-		print(RED + "[!] - An error occurred while querying crtsh" + END)
+		print(RED + "\t[!] - An error occurred while querying crtsh" + END)
 
 def alienvault(domain, args) -> None:
 	if(args.commonName):
@@ -177,7 +194,7 @@ def alienvault(domain, args) -> None:
 					output_file.write(entry["hostname"]+"\n")
 				output_file.close()
 		except:
-			print(RED + "[!] - An error occurred while querying alienvault" + END)
+			print(RED + "\t[!] - An error occurred while querying alienvault" + END)
 
 def askdns(domain, args) -> None:
 	if(args.commonName):
@@ -191,7 +208,7 @@ def askdns(domain, args) -> None:
 					output_file.write(entry.get_text()+"\n")
 			output_file.close()
 		except:
-			print(RED + "[!] - An error occurred while querying askdns" + END)
+			print(RED + "\t[!] - An error occurred while querying askdns" + END)
 		
 def spyonweb(domain, args) -> None:
 	if(args.commonName):
@@ -206,7 +223,7 @@ def spyonweb(domain, args) -> None:
 						output_file.write(entry.get_text()+"\n")
 				output_file.close()
 		except:
-			print(RED + "[!] - An error occurred while querying spyonweb" + END)
+			print(RED + "\t[!] - An error occurred while querying spyonweb" + END)
 
 def securitytrails(domain, args) -> None:
 	if(args.commonName and "securitytrails" in apiTokens):
@@ -222,7 +239,7 @@ def securitytrails(domain, args) -> None:
 					output_file.write(entry+".{domain}\n".format(domain=domain))
 				output_file.close()
 		except:
-			print(RED + "[!] - An error occurred while querying securitytrails" + END)
+			print(RED + "\t[!] - An error occurred while querying securitytrails" + END)
 
 def virustotal(domain, args) -> None:
 	if(args.commonName and "virustotal" in apiTokens):
@@ -238,7 +255,7 @@ def virustotal(domain, args) -> None:
 					output_file.write(entry["id"]+"\n")
 				output_file.close()
 		except:
-			print(RED + "[!] - An error occurred while querying virustotal" + END)
+			print(RED + "\t[!] - An error occurred while querying virustotal" + END)
 
 def doRequest(url) -> dict:
 	try:
@@ -273,7 +290,7 @@ def resolve():
 		print(RED + "[!] - Error opening {file}".format(file=input_file) + END)
 		sys.exit(1)
 
-	print("\n----------------------- RESOLVING ADDRESSES ------------------------\n")
+	print("\n[*] - Resolving addresses \n")
 	all_subdomains = len(urls)
 	if(all_subdomains > 0):
 		with ThreadPoolExecutor(max_workers=min(threads,all_subdomains)) as executor:
@@ -283,7 +300,7 @@ def resolve():
 				index = index + 1
 				if(response != None):
 					if(verbose):
-						print("[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)), "- response obtained from:",response["url"])
+						print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)), "- response obtained from:",response["url"])
 					if(response["code"] != None and response["code"] in status_codes):
 						if("https" in response["url"] or "http" in response["url"]):
 							available_url[response["url"]] = (str(response["code"]), response["redirect"])
@@ -293,7 +310,7 @@ def resolve():
 						discarted_url.append(response["url"] + " -> " + str(response["code"]) + "\n")
 				else:
 					if(verbose):
-						print("[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
+						print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
 			executor.shutdown()
 
 def printInfo(url, values):
@@ -313,9 +330,9 @@ def printInfo(url, values):
 		color = PURPLE
 	
 	if(redirect):
-		print(url + " -> " + color + status  + END + " -> " + redirect)
+		print("\t"+url + " -> " + color + status  + END + " -> " + redirect)
 	else:
-		print(url + " -> " + color + status + END)
+		print("\t"+url + " -> " + color + status + END)
 
 def parseFileInfo():
 	fileInfo = ""
@@ -329,22 +346,28 @@ def parseFileInfo():
 		splittedline = line.split(">")
 		try:
 			url,status,redirect = splittedline[0][:-1], splittedline[1][1:4], ""
-			if(status in filtered_status_codes):
+
+			urlParts, domainName = url.split("/")[2].split(".")[-2:], ""
+			if len(urlParts) == 1:
+				domainName = urlParts[0]
+			else:
+				domainName = urlParts[-2]
+			if(status in filtered_status_codes and (filtered_domains == None or domainName in filtered_domains)):
 				if(status in ["301","302","307"]):
 					redirect = splittedline[2][1:]
 				printInfo(url, (status, redirect))
 		except:
-			print(RED + "[!] - Error parsing the info in {file}, ¿are you using the file with the domains available?".format(file=input_file) + END)
+			print(RED + "[!] - Error parsing the info in {file}, are you using the file with the domains available?".format(file=input_file) + END)
 			sys.exit(1)
 
 def saveResults():
-	print("\n----------------------------- RESULTS ------------------------------\n")
+	print("\n[*] - Results \n")
 	if(all_subdomains > 0):
-		print("[*] - {all} subdomains obtained, {resolved} resolved. ".format(all=all_subdomains, resolved=len(available_url)))
-		print("[*] - {0:6.2f} % not resolving.".format(100 - (len(available_url) / all_subdomains * 100)))
-		print("[*] - {0:6.2f} % resolving.\n".format(len(available_url) / all_subdomains * 100))
+		print("\t[*] - {all} subdomains obtained, {resolved} resolved. ".format(all=all_subdomains, resolved=len(available_url)))
+		print("\t[*] - {0:6.2f} % not resolving.".format(100 - (len(available_url) / all_subdomains * 100)))
+		print("\t[*] - {0:6.2f} % resolving.\n".format(len(available_url) / all_subdomains * 100))
 		available_url_sorted = sorted(available_url.items(), key=lambda x: x[1])
-		with open(output_available, "w") as available_f:
+		with open(folderName + "/" + output_available, "w") as available_f:
 			for url, values in dict(available_url_sorted).items():
 				printInfo(url, values)
 				status, redirect = values[0], values[1]
@@ -354,18 +377,18 @@ def saveResults():
 					available_f.write(url + " -> " + status + "\n")
 			available_f.close()
 
-		with open(output_discarted, "w") as discarted_f:
+		with open(folderName + "/" + output_discarted, "w") as discarted_f:
 			discarted_f.writelines(discarted_url)
 			discarted_f.close()
 	else:
-		print("[*] - {all} subdomains obtained, {resolved} resolved. ".format(all=all_subdomains, resolved=len(available_url)))
+		print("\t[*] - {all} subdomains obtained, {resolved} resolved. ".format(all=all_subdomains, resolved=len(available_url)))
 
 	os.remove(tmp_file)
 	
 
 def parseArguments() -> dict:
 	parser = argparse.ArgumentParser(conflict_handler='resolve')
-	parser.add_argument('-f', '--file', type=str, help='file with urls to resolve (default recon.txt)')
+	parser.add_argument('-f', '--file', type=str, help='file with urls to resolve')
 	parser.add_argument('-o', '--output',type=str,help='name of the output file used for writing the results')
 	parser.add_argument('-te', '--targetEntity', type=str, help='target entity on which the subdomain search will be applied')
 	parser.add_argument('-cn', '--commonName', action='store_true', help='the aplication will use the target entity as common name')
@@ -376,7 +399,8 @@ def parseArguments() -> dict:
 	parser.add_argument('-k', '--insecure', action='store_true', help='Allow insecure server connections')
 	parser.add_argument('-v', '--verbose',action='store_true', help='enable verbose output')
 	parser.add_argument('-s', '--show',action='store_true',help='displays the information of an output file in colour')
-	parser.add_argument('-sc', '--statusCodes',nargs='+',help='filters the show parameter output to certain status codes')
+	parser.add_argument('-sc', '--showCodes',nargs='+',help='filters the show parameter output to certain status codes')
+	parser.add_argument('-sd', '--showDomains',nargs='+',help='filters the show parameter output to certain domains')
 
 	return parser.parse_args()
 
@@ -408,8 +432,11 @@ if __name__ == "__main__":
 
 	if(args.show):
 		input_file = args.file
-		if(args.statusCodes):
-			filtered_status_codes = args.statusCodes
+		if(args.showCodes):
+			filtered_status_codes = args.showCodes
+		if(args.showDomains):
+			filtered_domains = args.showDomains
+		print("[*] - Showing " + PURPLE + "{file}".format(file=input_file) + END + " content in seekolver format\n")
 		parseFileInfo()
 		sys.exit(0)
 
@@ -419,7 +446,6 @@ if __name__ == "__main__":
 		output_available=args.output
 
 	createFolders()
-
 	if(args.targetEntity):
 		subdomainsFinded = getSubdomains(args.targetEntity, args)
 	else:
@@ -438,5 +464,3 @@ if __name__ == "__main__":
 
 	resolve()
 	saveResults()
-
-	 
