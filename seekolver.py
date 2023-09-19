@@ -17,7 +17,7 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 tmp_file="tmp.txt"
 input_file="subdomains.txt"
 apitoken_file=os.path.dirname(os.path.realpath(sys.argv[0]))+"/apitokens.json"
-output_available="available.txt"
+output_available="available"
 output_discarted="discarted.txt"
 folderName = ""
 
@@ -35,7 +35,7 @@ all_subdomains=0
 timeoutValue=3
 
 #Default thread value
-threads=50
+threads=10
 
 #Valid status codes
 status_codes = [200,301,302,307,401,403,404,405,500,502,503]
@@ -54,6 +54,9 @@ verbose = False
 
 #Insecure requests
 secure = True
+
+#Ports to be scanned
+ports = []
 
 #Headers
 headers_json = {"User-Agent" : "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:101.0) Gecko/20100101 Firefox/101.0", "Accept" : "application/json, text/plain, */*"}
@@ -86,25 +89,24 @@ def printLogo():
 	print("\_)) ||___ ||___ || \\\  \\\_//  ||__|  \V/  ||___ || \\\ \n")   
 
 def createFolders():
-	global output_available, output_discarted,folderName
+	global output_available, output_discarted, folderName
 	print("\n[*] - Generating output files \n")
 	now = datetime.datetime.now()
 	folderName = now.strftime("seekolver_%Y_%m_%d")
 	if not os.path.isdir(folderName):
 		os.makedirs(folderName)
 
-	if os.path.exists(folderName + "/" + output_available):
+	if os.path.exists(folderName + "/" + "{output_available}.txt".format(output_available=output_available)):
 		count = 2
 		while True:
-			newFilename = "available_{count}.txt".format(count=count)
-			if not os.path.exists(folderName + "/" + newFilename):
+			newFilename = "{output_available}_{count}".format(output_available=output_available, count=count)
+			if not os.path.exists(folderName + "/" + "{newFilename}.txt".format(newFilename=newFilename)):
 				break
 			count += 1
 		output_available = newFilename
-		output_discarted = "discarted_{count}.txt".format(count=count)
 
+	output_available += ".txt"
 	open(folderName + "/" + output_available, "x")
-	open(folderName + "/" + output_discarted, "x")
 
 	if(os.path.isfile(tmp_file)):
 		os.remove(tmp_file)
@@ -138,12 +140,10 @@ def getSubdomains(domain, args) -> bool:
 	print("\t[*] -" + GREEN + " Virustotal" + END)
 	print("\t[*] -" + GREEN + " Spyonweb" + END)
 	print("\t[*] -" + GREEN + " Crt.sh" + END)
-	print("\t[*] -" + GREEN + " Askdns" + END)
 		
 	crtsh(domain,args)
 	spyonweb(domain,args)
 	alienvault(domain,args)
-	askdns(domain,args)
 	securitytrails(domain, args)
 	virustotal(domain, args)
 
@@ -195,20 +195,6 @@ def alienvault(domain, args) -> None:
 				output_file.close()
 		except:
 			print(RED + "\t[!] - An error occurred while querying alienvault" + END)
-
-def askdns(domain, args) -> None:
-	if(args.commonName):
-		try:
-			response = requests.get("https://askdns.com/domain/{domain}".format(domain=urllib.parse.quote_plus(domain)), headers=headers_html)
-			response_html = BeautifulSoup(response.text, 'html.parser')
-
-			output_file = open(tmp_file, "a")
-			for entry in response_html.find_all('a'):
-				if(domain in entry.get_text()):
-					output_file.write(entry.get_text()+"\n")
-			output_file.close()
-		except:
-			print(RED + "\t[!] - An error occurred while querying askdns" + END)
 		
 def spyonweb(domain, args) -> None:
 	if(args.commonName):
@@ -257,32 +243,60 @@ def virustotal(domain, args) -> None:
 		except:
 			print(RED + "\t[!] - An error occurred while querying virustotal" + END)
 
-def doRequest(url) -> dict:
-	try:
-		r, ext, redirect = "","",None
-		if("https" in url):
-			r = requests.get(url+":443", headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
-		elif("http" in url):
-			r = requests.get(url+":80", headers=headers_html,timeout=timeoutValue, allow_redirects=False,verify=secure)
+
+def doRequests(url) -> dict:
+	responses = {}
+	hasResponse, response, temp = False, {}, {}
+
+	if("https" in url or "http" in url):
+		(hasResponse, response) = doRequest(0, url, None, None)
+
+		if(hasResponse):
+			return (0, response)
 		else:
-			try:
-				r = requests.get("https://"+url+":443", headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
-				ext="https://"
-			except:
-				r = requests.get("http://"+url+":80", headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
-				ext="http://"
+			discarted_url.append(url + " -> " + "Failed to establish a new connection\n")
+			return None
+	else:
+		responses[url] = {}
+		httpProtocol, httpsProtocol = ["80", "8080"], ["443","8443"]
+		
+		for port in ports: 
+			if(port in httpProtocol):
+				(hasResponse, temp) = doRequest(1, url, port, "http")
+			elif(port in httpsProtocol):
+				(hasResponse, temp) = doRequest(1, url, port, "https")
+			else:
+				(hasResponse, temp) = doRequest(1, url, port, "https")
+
+			if(hasResponse):
+				responses[url][port] = temp
+
+		if(responses != {}):
+			return (1, responses)	
+		else:
+			discarted_url.append(url + " -> " + "Failed to establish a new connection\n")
+			return None
+	
+# mode 0: resolve	mode 1: discovery
+def doRequest(mode, url, port, protocol) -> dict: 
+	try:
+		redirect, response = "", {}
+
+		if(mode == 0):
+			response = requests.get(url, headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
+		elif(mode == 1):
+			response = requests.get("{protocol}://{url}:{port}".format(protocol=protocol, url=url, port=port), headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
 		if(redirects):
-			if(r.status_code in [301,302,307] and r.headers['Location']):
-				redirect = r.headers['Location']
-			
-		return {"code":r.status_code, "extension":ext, "url":url, "redirect": redirect}
+			if(response.status_code in [301,302,307] and response.headers['Location']):
+				redirect = response.headers['Location']
+		
+		return (True, {"statusCode":response.status_code, "protocol":protocol, "url":url, "port": port, "redirect": redirect})
 	except:
-		discarted_url.append(url + " -> " + "Failed to establish a new connection\n")
-		return None
+		return (False, None)
 
 def resolve():
 	global all_subdomains
-	index, url = 0, ""
+	index = 0
 
 	try:
 		urls = open(input_file).read().splitlines()
@@ -291,27 +305,46 @@ def resolve():
 		sys.exit(1)
 
 	print("\n[*] - Resolving addresses \n")
+	print("\t[*] - Scanning ports " + GREEN + "{ports}\n".format(ports=' '.join(ports)) + END)
+
 	all_subdomains = len(urls)
 	if(all_subdomains > 0):
 		with ThreadPoolExecutor(max_workers=min(threads,all_subdomains)) as executor:
-			futures = [executor.submit(doRequest, url) for url in urls]
+			futures = [executor.submit(doRequests, url) for url in urls]
 			for future_completed in as_completed(futures):
 				response = future_completed.result()
 				index = index + 1
 				if(response != None):
-					if(verbose):
-						print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)), "- response obtained from:",response["url"])
-					if(response["code"] != None and response["code"] in status_codes):
-						if("https" in response["url"] or "http" in response["url"]):
-							available_url[response["url"]] = (str(response["code"]), response["redirect"])
-						else:
-							available_url[response["extension"] + response["url"]] = (str(response["code"]), response["redirect"])
-					elif(response["code"] != None):
-						discarted_url.append(response["url"] + " -> " + str(response["code"]) + "\n")
+					mode, responseContent = response[0], response[1]
+
+					if(mode == 0):
+						resolveExecution(responseContent, index, all_subdomains)
+					elif(mode == 1):
+						for url in responseContent:
+							for port in responseContent[url]:
+								resolveExecution(responseContent[url][port], index, all_subdomains)
 				else:
 					if(verbose):
 						print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
 			executor.shutdown()
+
+def resolveExecution(response, index, all_subdomains):
+	if(response["statusCode"] != None):
+		if(response["statusCode"] in status_codes):
+			if(verbose):
+				print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)), "- response obtained from: {url}:{port}".format(url=response["url"], port=response["port"]))
+			if("https" in response["url"] or "http" in response["url"]):
+				available_url[response["url"]] = (str(response["statusCode"]), response["redirect"])
+			else:
+				available_url["{protocol}://{url}:{port}".format(protocol=response["protocol"],url=response["url"],port=response["port"])] = (str(response["statusCode"]), response["redirect"])
+		else:
+			if(verbose):
+				print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
+			discarted_url.append(response["url"] + " -> " + str(response["statusCode"]) + "\n")
+	else:
+		if(verbose):
+			print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
+	
 
 def printInfo(url, values):
 	color = ""
@@ -335,6 +368,8 @@ def printInfo(url, values):
 		print("\t"+url + " -> " + color + status + END)
 
 def parseFileInfo():
+	print("[*] - Showing " + PURPLE + "{file}".format(file=input_file) + END + " content in seekolver format\n")
+
 	fileInfo = ""
 	try:
 		fileInfo = open(input_file).read().splitlines()
@@ -357,7 +392,7 @@ def parseFileInfo():
 					redirect = splittedline[2][1:]
 				printInfo(url, (status, redirect))
 		except:
-			print(RED + "[!] - Error parsing the info in {file}, are you using the file with the domains available?".format(file=input_file) + END)
+			print(RED + "[!] - Error parsing the info in {file}, are you providing the correct file?".format(file=input_file) + END)
 			sys.exit(1)
 
 def saveResults():
@@ -366,6 +401,7 @@ def saveResults():
 		print("\t[*] - {all} subdomains obtained, {resolved} resolved. ".format(all=all_subdomains, resolved=len(available_url)))
 		print("\t[*] - {0:6.2f} % not resolving.".format(100 - (len(available_url) / all_subdomains * 100)))
 		print("\t[*] - {0:6.2f} % resolving.\n".format(len(available_url) / all_subdomains * 100))
+
 		available_url_sorted = sorted(available_url.items(), key=lambda x: x[1])
 		with open(folderName + "/" + output_available, "w") as available_f:
 			for url, values in dict(available_url_sorted).items():
@@ -377,7 +413,7 @@ def saveResults():
 					available_f.write(url + " -> " + status + "\n")
 			available_f.close()
 
-		with open(folderName + "/" + output_discarted, "w") as discarted_f:
+		with open(folderName + "/" + output_discarted, "a") as discarted_f:
 			discarted_f.writelines(discarted_url)
 			discarted_f.close()
 	else:
@@ -393,23 +429,19 @@ def parseArguments() -> dict:
 	parser.add_argument('-te', '--targetEntity', type=str, help='target entity on which the subdomain search will be applied')
 	parser.add_argument('-cn', '--commonName', action='store_true', help='the aplication will use the target entity as common name')
 	parser.add_argument('-on', '--organisationName', action='store_true', help='the aplication will use the target entity as organisation name')
-	parser.add_argument('-t', '--threads', type=int, help='number of threads to be used (default 50)')
+	parser.add_argument('-t', '--threads', type=int, help='number of threads to be used (default 10)')
+	parser.add_argument('-p', '--ports', nargs='+', help='ports to be scanned, only HTTPx services allowed [<PORT> <PORT2>]')
 	parser.add_argument('-to', '--timeout',type=int, help='timeout value for requests (default 3s)')
 	parser.add_argument('-r', '--redirect',action='store_true', help='resolves redirections')
-	parser.add_argument('-k', '--insecure', action='store_true', help='Allow insecure server connections')
+	parser.add_argument('-k', '--insecure', action='store_true', help='allow insecure server connections')
 	parser.add_argument('-v', '--verbose',action='store_true', help='enable verbose output')
 	parser.add_argument('-s', '--show',action='store_true',help='displays the information of an output file in colour')
-	parser.add_argument('-sc', '--showCodes',nargs='+',help='filters the show parameter output to certain status codes')
+	parser.add_argument('-sc', '--showCodes',nargs='+',help='filters the show parameter output to certain status codes [<STATUS_CODE> <STATUS_CODE2>]')
 	parser.add_argument('-sd', '--showDomains',nargs='+',help='filters the show parameter output to certain domains')
 
 	return parser.parse_args()
 
-if __name__ == "__main__":
-	args = parseArguments()
-	
-	printLogo()
-	subdomainsFinded = False
-
+def checkArgErrors(args) -> None:
 	if(args.show and not args.file):
 		print(RED + "[!] - parameter -f missing, -s needs a file to display" + END)
 		sys.exit(1)
@@ -422,6 +454,10 @@ if __name__ == "__main__":
 		print(RED + "[!] - parameters -te | -f required, use -h for help" + END)
 		sys.exit(1)
 
+	if((args.targetEntity or args.file) and not args.ports):
+		print(RED + "[!] - parameter -p missing, use -h for help" + END)
+		sys.exit(1)
+
 	if (args.targetEntity):
 		if(args.commonName and args.organisationName):
 			print(RED + "[!] - parameters -cn | -on cannot be used at the same time" + END)
@@ -430,13 +466,19 @@ if __name__ == "__main__":
 			print(RED + "[!] - parameters -cn | -on required" + END)
 			sys.exit(1)
 
+
+if __name__ == "__main__":
+	args = parseArguments()
+	
+	printLogo()
+	checkArgErrors(args)
+	
 	if(args.show):
 		input_file = args.file
 		if(args.showCodes):
 			filtered_status_codes = args.showCodes
 		if(args.showDomains):
 			filtered_domains = args.showDomains
-		print("[*] - Showing " + PURPLE + "{file}".format(file=input_file) + END + " content in seekolver format\n")
 		parseFileInfo()
 		sys.exit(0)
 
@@ -444,10 +486,12 @@ if __name__ == "__main__":
 
 	if(args.output):
 		output_available=args.output
+	if(args.ports):
+		ports = args.ports
 
 	createFolders()
 	if(args.targetEntity):
-		subdomainsFinded = getSubdomains(args.targetEntity, args)
+		getSubdomains(args.targetEntity, args)
 	else:
 		input_file = args.file
 	

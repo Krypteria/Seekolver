@@ -15,15 +15,17 @@ options:
   -on, --organisationName
                         the aplication will use the target entity as organisation name
   -t THREADS, --threads THREADS
-                        number of threads to be used (default 50)
+                        number of threads to be used (default 10)
+  -p PORTS [PORTS ...], --ports PORTS [PORTS ...]
+                        ports to be scanned, only HTTPx services allowed [<PORT> <PORT2>]
   -to TIMEOUT, --timeout TIMEOUT
                         timeout value for requests (default 3s)
   -r, --redirect        resolves redirections
-  -k, --insecure        Allow insecure server connections
+  -k, --insecure        allow insecure server connections
   -v, --verbose         enable verbose output
   -s, --show            displays the information of an output file in colour
   -sc SHOWCODES [SHOWCODES ...], --showCodes SHOWCODES [SHOWCODES ...]
-                        filters the show parameter output to certain status codes
+                        filters the show parameter output to certain status codes [<STATUS_CODE> <STATUS_CODE2>]
   -sd SHOWDOMAINS [SHOWDOMAINS ...], --showDomains SHOWDOMAINS [SHOWDOMAINS ...]
                         filters the show parameter output to certain domains
 ```
@@ -36,7 +38,7 @@ It is not uncommon in a Pentesting / Red Team / Bug Bounty exercise to come acro
 
 Currently there are fantastic tools for attack surface mapping like [Amass](https://github.com/OWASP/Amass) and tools like [httpx](https://github.com/projectdiscovery/httpx) for address resolution so it occurred to me that it could be interesting to centralise both functionalities in the same tool, automating certain processes to obtain results more quickly. 
 
-Currently Seekolver makes use of **Securitytrails**, **Alienvault**, **Askdns**, **Spyonweb**, **Crt.sh** and **Virustotal** to search for subdomains, but more may be added in the future.
+Currently Seekolver makes use of **Securitytrails**, **Alienvault**, **Spyonweb**, **Crt.sh** and **Virustotal** to search for subdomains, but more may be added in the future.
 
 </div>
 
@@ -85,7 +87,7 @@ This mode performs a search of all subdomains belonging to the given domain usin
 </div>
 
 ```
-python3 seekolver.py -te www.corp.com -cn
+python3 seekolver.py -te www.corp.com -cn -p 80 443
 ```
 
 ### Basic usage: domain search and resolve over a organisation
@@ -97,7 +99,7 @@ This mode performs a search of all domains belonging to the given organisation u
 </div>
 
 ```
-python3 seekolver.py -te "CORP SA" -on
+python3 seekolver.py -te "CORP SA" -on -p 80 443 8080 8443
 ```
 
 ### Optional arguments
