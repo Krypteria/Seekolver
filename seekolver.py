@@ -301,11 +301,11 @@ def resolve():
 	try:
 		urls = open(input_file).read().splitlines()
 	except:
-		print(RED + "[!] - Error opening {file}".format(file=input_file) + END)
+		print(RED + "\n[!] - Error opening {file}".format(file=input_file) + END)
 		sys.exit(1)
 
 	print("\n[*] - Resolving addresses \n")
-	print("\t[*] - Scanning ports " + GREEN + "{ports}\n".format(ports=' '.join(ports)) + END)
+	print("\t[*] - Resolving ports " + YELLOW + "{ports}\n".format(ports=' '.join(ports)) + END)
 
 	all_subdomains = len(urls)
 	if(all_subdomains > 0):
@@ -329,21 +329,20 @@ def resolve():
 			executor.shutdown()
 
 def resolveExecution(response, index, all_subdomains):
-	if(response["statusCode"] != None):
-		if(response["statusCode"] in status_codes):
-			if(verbose):
+	if(response["statusCode"] in status_codes):
+		if(verbose):
+			if(response["port"] != None):
 				print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)), "- response obtained from: {url}:{port}".format(url=response["url"], port=response["port"]))
-			if("https" in response["url"] or "http" in response["url"]):
-				available_url[response["url"]] = (str(response["statusCode"]), response["redirect"])
 			else:
-				available_url["{protocol}://{url}:{port}".format(protocol=response["protocol"],url=response["url"],port=response["port"])] = (str(response["statusCode"]), response["redirect"])
+				print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)), "- response obtained from: {url}".format(url=response["url"]))
+		if("https" in response["url"] or "http" in response["url"]):
+			available_url[response["url"]] = (str(response["statusCode"]), response["redirect"])
 		else:
-			if(verbose):
-				print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
-			discarted_url.append(response["url"] + " -> " + str(response["statusCode"]) + "\n")
+			available_url["{protocol}://{url}:{port}".format(protocol=response["protocol"],url=response["url"],port=response["port"])] = (str(response["statusCode"]), response["redirect"])
 	else:
 		if(verbose):
 			print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
+		discarted_url.append(response["url"] + " -> " + str(response["statusCode"]) + "\n")
 	
 
 def printInfo(url, values):
@@ -398,9 +397,8 @@ def parseFileInfo():
 def saveResults():
 	print("\n[*] - Results \n")
 	if(all_subdomains > 0):
-		print("\t[*] - {all} subdomains obtained, {resolved} resolved. ".format(all=all_subdomains, resolved=len(available_url)))
-		print("\t[*] - {0:6.2f} % not resolving.".format(100 - (len(available_url) / all_subdomains * 100)))
-		print("\t[*] - {0:6.2f} % resolving.\n".format(len(available_url) / all_subdomains * 100))
+		print("\t[*] - {all} subdomains obtained".format(all=all_subdomains))
+		print("\t[*] - {resolved} web services resolved\n".format(resolved=len(available_url)))
 
 		available_url_sorted = sorted(available_url.items(), key=lambda x: x[1])
 		with open(folderName + "/" + output_available, "w") as available_f:
