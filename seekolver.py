@@ -416,8 +416,8 @@ def parseFileInfo():
 		splittedline = line.split(">")
 		try:
 			url,status,redirect = splittedline[0][:-1], splittedline[1][1:4], ""
-			
-			if(status in ["301","302","307"]):
+
+			if(status in ["301","302","307"] and len(splittedline)>2):
 					redirect = splittedline[2][1:]
 
 			found = False
