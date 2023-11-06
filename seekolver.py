@@ -43,8 +43,8 @@ status_codes = [200,301,302,307,401,403,404,405,500,502,503]
 #filtered status codes
 filtered_status_codes = ["200","301","302","307","401","403","404","405","500","502","503"]
 
-#filtered domains
-filtered_domains = None
+#filtered strings
+filtered_strings = None
 
 #Redirects allowed
 redirects = False
@@ -157,7 +157,15 @@ def getSubdomains(domain, args) -> bool:
 	output_file.close()
 
 	if os.path.getsize(input_file) != 0:
-		print("\n\t[*] - Subdomains associated with the domain {domain} found".format(domain=domain))
+		urls = []
+		try:
+			urls = open(input_file).read().splitlines()
+		except:
+			print(RED + "\n[!] - Error opening {file}".format(file=input_file) + END)
+			sys.exit(1)
+
+		print("\n\t[*] - {subdomains} subdomains associated with the domain {domain} found".format(subdomains = len(urls), domain=domain))
+		urls.clear()
 		return True
 	else:
 		print("\n\t" + RED + "[!] - Domain {domain} is not correct or doesn't have subdomains\n".format(domain=domain) + END)
@@ -243,6 +251,21 @@ def virustotal(domain, args) -> None:
 		except:
 			print(RED + "\t[!] - An error occurred while querying virustotal" + END)
 
+def doRequest(mode, url, port, protocol) -> dict: 
+	try:
+		redirect, response = "", {}
+
+		if(mode == 0):
+			response = requests.get(url, headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
+		elif(mode == 1):
+			response = requests.get("{protocol}://{url}:{port}".format(protocol=protocol, url=url, port=port), headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
+		if(redirects):
+			if(response.status_code in [301,302,307] and response.headers['Location']):
+				redirect = response.headers['Location']
+		
+		return (True, {"statusCode":response.status_code, "protocol":protocol, "url":url, "port": port, "redirect": redirect})
+	except:
+		return (False, None)
 
 def doRequests(url) -> dict:
 	responses = {}
@@ -266,7 +289,7 @@ def doRequests(url) -> dict:
 			elif(port in httpsProtocol):
 				(hasResponse, temp) = doRequest(1, url, port, "https")
 			else:
-				(hasResponse, temp) = doRequest(1, url, port, "https")
+				(hasResponse, temp) = doRequest(1, url, port, "https") #temporal
 
 			if(hasResponse):
 				responses[url][port] = temp
@@ -276,59 +299,11 @@ def doRequests(url) -> dict:
 		else:
 			discarted_url.append(url + " -> " + "Failed to establish a new connection\n")
 			return None
-	
-# mode 0: resolve	mode 1: discovery
-def doRequest(mode, url, port, protocol) -> dict: 
-	try:
-		redirect, response = "", {}
 
-		if(mode == 0):
-			response = requests.get(url, headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
-		elif(mode == 1):
-			response = requests.get("{protocol}://{url}:{port}".format(protocol=protocol, url=url, port=port), headers=headers_html, timeout=timeoutValue, allow_redirects=False, verify=secure)
-		if(redirects):
-			if(response.status_code in [301,302,307] and response.headers['Location']):
-				redirect = response.headers['Location']
-		
-		return (True, {"statusCode":response.status_code, "protocol":protocol, "url":url, "port": port, "redirect": redirect})
-	except:
-		return (False, None)
+def resolveExecution(response, url, port ,index, all_subdomains):
+	if(url != None and port != None):
+		response = response[url][port]
 
-def resolve():
-	global all_subdomains
-	index = 0
-
-	try:
-		urls = open(input_file).read().splitlines()
-	except:
-		print(RED + "\n[!] - Error opening {file}".format(file=input_file) + END)
-		sys.exit(1)
-
-	print("\n[*] - Resolving addresses \n")
-	print("\t[*] - Resolving ports " + YELLOW + "{ports}\n".format(ports=' '.join(ports)) + END)
-
-	all_subdomains = len(urls)
-	if(all_subdomains > 0):
-		with ThreadPoolExecutor(max_workers=min(threads,all_subdomains)) as executor:
-			futures = [executor.submit(doRequests, url) for url in urls]
-			for future_completed in as_completed(futures):
-				response = future_completed.result()
-				index = index + 1
-				if(response != None):
-					mode, responseContent = response[0], response[1]
-
-					if(mode == 0):
-						resolveExecution(responseContent, index, all_subdomains)
-					elif(mode == 1):
-						for url in responseContent:
-							for port in responseContent[url]:
-								resolveExecution(responseContent[url][port], index, all_subdomains)
-				else:
-					if(verbose):
-						print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
-			executor.shutdown()
-
-def resolveExecution(response, index, all_subdomains):
 	if(response["statusCode"] in status_codes):
 		if(verbose):
 			if(response["port"] != None):
@@ -344,10 +319,51 @@ def resolveExecution(response, index, all_subdomains):
 			print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
 		discarted_url.append(response["url"] + " -> " + str(response["statusCode"]) + "\n")
 	
+# mode 0: resolve	mode 1: discovery
+def resolve():
+	global all_subdomains
+	index = 0
 
-def printInfo(url, values):
-	color = ""
-	status, redirect = values[0], values[1]
+	try:
+		urls = open(input_file).read().splitlines()
+	except:
+		print(RED + "\n[!] - Error opening {file}".format(file=input_file) + END)
+		sys.exit(1)
+
+	print("\n[*] - Resolving addresses \n")
+	print("\t[*] - Resolving ports " + YELLOW + "{ports}\n".format(ports=' '.join(ports)) + END)
+
+	all_subdomains = len(urls)
+	if(all_subdomains > 0):
+		chunks = min(threads,all_subdomains)
+		chunked_urls = [urls[i:i + chunks] for i in range(0, len(urls), chunks)]
+
+		with ThreadPoolExecutor(max_workers=chunks) as executor:
+			for chunk in chunked_urls:
+				doRequest_results = []
+
+				futures = [executor.submit(doRequests, url) for url in chunk]
+				for future_completed in as_completed(futures):
+					doRequest_results.append(future_completed.result()) 
+					index = index + 1
+
+				for doRequest_result in doRequest_results:
+					if(doRequest_result != None): 
+						mode, responseContent = doRequest_result[0], doRequest_result[1] 
+						if(mode == 0):
+							futures = [executor.submit(resolveExecution, responseContent, None , None , index, all_subdomains)]
+						elif(mode == 1):
+							for port in responseContent[list(responseContent.keys())[0]]: 
+								futures = [executor.submit(resolveExecution, responseContent, list(responseContent.keys())[0], port, index, all_subdomains)]
+
+						for _ in as_completed(futures): 
+							pass
+					else:
+						if(verbose):
+							print("\t[*]","{0:6.2f}%".format(round((index / all_subdomains * 100), 2)))
+			executor.shutdown()
+
+def statusCodeColor(status):
 	if(status == "200"):
 		color = GREEN
 	if(status == "301"):
@@ -360,6 +376,12 @@ def printInfo(url, values):
 		color = RED
 	if(status in ["500","502","503"]):
 		color = PURPLE
+
+	return color
+
+def printInfo(url, values):
+	status, redirect = values[0], values[1]
+	color = statusCodeColor(status)
 	
 	if(redirect):
 		print("\t"+url + " -> " + color + status  + END + " -> " + redirect)
@@ -368,6 +390,20 @@ def printInfo(url, values):
 
 def parseFileInfo():
 	print("[*] - Showing " + PURPLE + "{file}".format(file=input_file) + END + " content in seekolver format\n")
+
+	if(filtered_strings):
+		strings = ""
+		for string in filtered_strings:
+			strings += YELLOW + string + END + " "
+		print("\t[*] - Filtering by " + YELLOW + "{strings}".format(strings=strings[:-1]) + END + " strings")
+	if(filtered_status_codes):
+		status_codes = ""
+		for status_code in filtered_status_codes:
+			status_codes += statusCodeColor(status_code) + status_code + END + " "
+		print("\t[*] - Filtering by " + YELLOW + "{status_codes}".format(status_codes = status_codes[:-1]) + END + " status code")
+	
+	if(filtered_status_codes or filtered_strings):
+		print("")
 
 	fileInfo = ""
 	try:
@@ -380,15 +416,20 @@ def parseFileInfo():
 		splittedline = line.split(">")
 		try:
 			url,status,redirect = splittedline[0][:-1], splittedline[1][1:4], ""
-
-			urlParts, domainName = url.split("/")[2].split(".")[-2:], ""
-			if len(urlParts) == 1:
-				domainName = urlParts[0]
-			else:
-				domainName = urlParts[-2]
-			if(status in filtered_status_codes and (filtered_domains == None or domainName in filtered_domains)):
-				if(status in ["301","302","307"]):
+			
+			if(status in ["301","302","307"]):
 					redirect = splittedline[2][1:]
+
+			found = False
+			if(filtered_strings == None):
+				found = True
+			else:
+				for string in filtered_strings:
+					if string in url or string in redirect:
+						found = True
+						break
+			
+			if(status in filtered_status_codes and found):
 				printInfo(url, (status, redirect))
 		except:
 			print(RED + "[!] - Error parsing the info in {file}, are you providing the correct file?".format(file=input_file) + END)
@@ -435,7 +476,7 @@ def parseArguments() -> dict:
 	parser.add_argument('-v', '--verbose',action='store_true', help='enable verbose output')
 	parser.add_argument('-s', '--show',action='store_true',help='displays the information of an output file in colour')
 	parser.add_argument('-sc', '--showCodes',nargs='+',help='filters the show parameter output to certain status codes [<STATUS_CODE> <STATUS_CODE2>]')
-	parser.add_argument('-sd', '--showDomains',nargs='+',help='filters the show parameter output to certain domains')
+	parser.add_argument('-ss', '--showStrings',nargs='+',help='filters the show parameter output to certain strings')
 
 	return parser.parse_args()
 
@@ -452,7 +493,7 @@ def checkArgErrors(args) -> None:
 		print(RED + "[!] - parameters -te | -f required, use -h for help" + END)
 		sys.exit(1)
 
-	if((args.targetEntity or args.file) and not args.ports):
+	if((args.targetEntity or args.file and not args.show) and not args.ports):
 		print(RED + "[!] - parameter -p missing, use -h for help" + END)
 		sys.exit(1)
 
@@ -475,8 +516,8 @@ if __name__ == "__main__":
 		input_file = args.file
 		if(args.showCodes):
 			filtered_status_codes = args.showCodes
-		if(args.showDomains):
-			filtered_domains = args.showDomains
+		if(args.showStrings):
+			filtered_strings = args.showStrings
 		parseFileInfo()
 		sys.exit(0)
 

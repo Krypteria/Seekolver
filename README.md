@@ -1,8 +1,9 @@
 ![image](https://user-images.githubusercontent.com/55555187/222470819-24e20322-3a83-44ab-8f64-a7a6947f3a98.png)
 
 ```
-usage: seekolver.py [-h] [-f FILE] [-o OUTPUT] [-te TARGETENTITY] [-cn] [-on] [-t THREADS] [-to TIMEOUT] [-r] [-k] [-v] [-s] [-sc SHOWCODES [SHOWCODES ...]]
-                    [-sd SHOWDOMAINS [SHOWDOMAINS ...]]
+usage: seekolver.py [-h] [-f FILE] [-o OUTPUT] [-te TARGETENTITY] [-cn] [-on] [-t THREADS] [-p PORTS [PORTS ...]] [-to TIMEOUT] [-r] [-k] [-v] [-s]
+                    [-sc SHOWCODES [SHOWCODES ...]] [-ss SHOWSTRINGS [SHOWSTRINGS ...]]
+
 
 options:
   -h, --help            show this help message and exit
@@ -26,8 +27,8 @@ options:
   -s, --show            displays the information of an output file in colour
   -sc SHOWCODES [SHOWCODES ...], --showCodes SHOWCODES [SHOWCODES ...]
                         filters the show parameter output to certain status codes [<STATUS_CODE> <STATUS_CODE2>]
-  -sd SHOWDOMAINS [SHOWDOMAINS ...], --showDomains SHOWDOMAINS [SHOWDOMAINS ...]
-                        filters the show parameter output to certain domains
+  -ss SHOWSTRINGS [SHOWSTRINGS ...], --showStrings SHOWSTRINGS [SHOWSTRINGS ...]
+                        filters the show parameter output to certain strings
 ```
 
 ## About the tool
@@ -59,7 +60,7 @@ To make use of the *Virustotal* and *Securitytrails* services to search for subd
 
 ## Example of use
 
-![image](https://user-images.githubusercontent.com/55555187/222470674-1d2501ca-ed38-4a83-b9f8-b0897aaa461b.png)
+![image](https://github.com/Krypteria/Seekolver/assets/55555187/388ec97d-04f3-4746-8190-af628a190ca0)
 
 ### Basic usage: resolution of the urls contained in a file
 
@@ -75,7 +76,7 @@ www.corp.com -> valid
 ```
 
 ```
-python3 seekolver.py -f recon.txt
+python seekolver.py -f recon.txt -p 80 443
 ```
 
 ### Basic usage: subdomain search and resolve over a domain
@@ -87,7 +88,7 @@ This mode performs a search of all subdomains belonging to the given domain usin
 </div>
 
 ```
-python3 seekolver.py -te www.corp.com -cn -p 80 443
+python seekolver.py -te www.corp.com -cn -p 80 443
 ```
 
 ### Basic usage: domain search and resolve over a organisation
@@ -99,7 +100,7 @@ This mode performs a search of all domains belonging to the given organisation u
 </div>
 
 ```
-python3 seekolver.py -te "CORP SA" -on -p 80 443 8080 8443
+python seekolver.py -te "CORP SA" -on -p 80 443 8080 8443
 ```
 
 ### Optional arguments
@@ -121,10 +122,10 @@ To facilitate the visualisation of results, the tool has the ability to interpre
 </div>
 
 ```
-python3 seekolver.py -f available.txt -s -sc 200 301 302 401
+python seekolver.py -s -f seekolver_2023_11_06/poc.txt -sc 200 301 302 -ss api emails education docs
 ```
 
-![image](https://user-images.githubusercontent.com/55555187/222472393-bd2fde0d-8300-4efd-949a-d06369e053fc.png)
+![image](https://github.com/Krypteria/Seekolver/assets/55555187/a4b2f512-2114-44be-bbd8-f2f8a0938131)
 
 ## Dependencies
 
