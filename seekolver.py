@@ -38,10 +38,10 @@ timeoutValue=3
 threads=10
 
 #Valid status codes
-status_codes = [200,301,302,307,401,403,404,405,500,502,503]
+status_codes = [200,301,302,303,307,308,401,403,404,405,500,502,503]
 
 #filtered status codes
-filtered_status_codes = ["200","301","302","307","401","403","404","405","500","502","503"]
+filtered_status_codes = ["200","301","302","303","307","308","401","403","404","405","500","502","503"]
 
 #filtered strings
 filtered_strings = None
@@ -364,13 +364,15 @@ def resolve():
 			executor.shutdown()
 
 def statusCodeColor(status):
+	color=""
+
 	if(status == "200"):
 		color = GREEN
 	if(status == "301"):
 		color = LIGHT_BLUE
-	if(status == "302"):
+	if(status in ["302", "303","307","308"]):
 		color = BLUE
-	if(status in ["307","401","405"]):
+	if(status in ["401","405"]):
 		color = YELLOW
 	if(status in ["403","404"]):
 		color = RED
@@ -417,7 +419,7 @@ def parseFileInfo():
 		try:
 			url,status,redirect = splittedline[0][:-1], splittedline[1][1:4], ""
 
-			if(status in ["301","302","307"] and len(splittedline)>2):
+			if(status in ["301","302","303","307","308"] and len(splittedline)>2):
 					redirect = splittedline[2][1:]
 
 			found = False
